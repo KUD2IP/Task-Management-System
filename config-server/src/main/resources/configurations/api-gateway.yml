@@ -1,0 +1,14 @@
+eureka:
+  client:
+    register-with-eureka: false
+
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      routes:
+
+server:
+    port: 8090
