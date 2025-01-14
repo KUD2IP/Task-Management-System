@@ -5,7 +5,7 @@
   <groupId>org.example</groupId>
   <artifactId>Task-Management-System</artifactId>
   <version>1.0-SNAPSHOT</version>
-  <packaging>jar</packaging>
+  <packaging>pom</packaging>
 
   <name>Task-Management-System</name>
   <url>http://maven.apache.org</url>
@@ -14,6 +14,7 @@
     <module>config-server</module>
     <module>api-gateway</module>
     <module>eureka-server</module>
+    <module>authentication-service</module>
   </modules>
 
   <properties>
