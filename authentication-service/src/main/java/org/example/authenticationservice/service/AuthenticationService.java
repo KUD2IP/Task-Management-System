@@ -2,6 +2,7 @@ package org.example.authenticationservice.service;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.example.authenticationservice.dto.AuthenticationResponseDto;
 import org.example.authenticationservice.dto.LoginRequestDto;
 import org.example.authenticationservice.dto.RegistrationRequestDto;
@@ -25,22 +26,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Set;
 
+@Slf4j
 @Service
 public class AuthenticationService {
+
     private final UserRepository userRepository;
-
     private final RoleRepository roleRepository;
-
     private final BlackListRepository blackListRepository;
-
     private final JwtService jwtService;
-
     private final PasswordEncoder passwordEncoder;
-
     private final AuthenticationManager authenticationManager;
-
     private final RefreshTokenRepository refreshTokenRepository;
-
 
     public AuthenticationService(UserRepository userRepository,
                                  RoleRepository roleRepository,
@@ -61,137 +57,162 @@ public class AuthenticationService {
     /**
      * Регистрация нового пользователя.
      *
-     * @param request запрос на регистрацию
-     *
+     * @param request Запрос на регистрацию, содержащий данные пользователя.
      */
     public void register(RegistrationRequestDto request) {
+        log.info("Starting registration for email: {}", request.getEmail());
+
         // Создание нового пользователя
         User user = new User();
 
+        // Поиск пользователя по email
+        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+            log.error("User with email {} already exists", request.getEmail());
+            throw new RuntimeException("User with email " + request.getEmail() + " already exists");
+        }
+
+        // Поиск роли пользователя (в данном случае роль USER)
         Role userRole = roleRepository.findByName("USER")
-                .orElseThrow(() -> new RuntimeException("Role USER not found"));
+                .orElseThrow(() -> {
+                    log.error("Role USER not found");
+                    return new RuntimeException("Role USER not found");
+                });
 
-        // Заполнение полей пользователя
-        user.setEmail(request.getEmail()); // устанавливаем электронную почту пользователя
+        // Заполнение данных пользователя
+        user.setEmail(request.getEmail());
         user.setName(request.getName());
-        user.setPassword(passwordEncoder.encode(request.getPassword())); // устанавливаем пароль пользователя
-        user.setRoles(Set.of(userRole)); // устанавливаем роль пользователя
+        user.setPassword(passwordEncoder.encode(request.getPassword()));  // Хеширование пароля
+        user.setRoles(Set.of(userRole));  // Устанавливаем роль
 
-        // Сохранение пользователя в базе данных
-        user = userRepository.save(user); // сохраняем пользователя в базе данных
+        // Сохранение нового пользователя в базе данных
+        user = userRepository.save(user);
 
+        log.info("User registered successfully with email: {}", user.getEmail());
     }
 
-
     /**
-     * Авторизация пользователя.
+     * Авторизация пользователя. Генерация токенов для доступа и обновления.
      *
-     * @param request объект с данными пользователя для авторизации
-     * @return объект с токеном авторизации
+     * @param request Данные пользователя для входа (email, пароль).
+     * @return Объект с двумя токенами: access и refresh.
      */
     public AuthenticationResponseDto authenticate(LoginRequestDto request) {
-        // Авторизация пользователя
+        log.info("Attempting to authenticate user with email: {}", request.getEmail());
+
+        // Аутентификация пользователя с использованием менеджера аутентификации
         authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.getEmail(),
-                        request.getPassword()
-                )
+                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
         );
 
-        // Поиск пользователя по имени пользователя
+        // Поиск пользователя по email
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow();
+                .orElseThrow(() -> {
+                    log.error("User not found with email: {}", request.getEmail());
+                    return new RuntimeException("User not found");
+                });
 
-        String accessToken = jwtService.generateAccessToken(user); // генерируем токен авторизации
-        String refreshToken = jwtService.generateRefreshToken(user); // генерируем токен обновления
+        // Генерация токенов
+        String accessToken = jwtService.generateAccessToken(user);
+        String refreshToken = jwtService.generateRefreshToken(user);
 
+        // Сохранение refresh токена в базе данных
         saveUserToken(refreshToken, user);
 
-        // Возвращение объекта с токеном авторизации
+        log.info("Authentication successful for user: {}", user.getEmail());
+
+        // Возвращаем объект с access и refresh токенами
         return new AuthenticationResponseDto(accessToken, refreshToken);
     }
 
     /**
-     * Сохраняет токен авторизации пользователя в базе данных.
+     * Сохраняет токен refresh в базе данных.
      *
      * @param refreshToken Токен обновления.
-     * @param user Информация о пользователе.
+     * @param user Пользователь, для которого генерируется токен.
      */
     private void saveUserToken(String refreshToken, User user) {
-        // Создание объекта токена
+        log.info("Saving refresh token for user: {}", user.getEmail());
+
+        // Создаем объект токена
         RefreshToken token = new RefreshToken();
-
-        // Установка значения токена
         token.setToken(refreshToken);
-
-        // Установка значения пользователя
         token.setUser(user);
+        token.setExpiryDate(jwtService.calculateExpirationDate(refreshToken));  // Рассчитываем время истечения
 
-        token.setExpiryDate(jwtService.calculateExpirationDate(refreshToken));
-
-        // Сохранение токена в базе данных
-        refreshTokenRepository.save(token);
+        // Сохраняем токен в базе данных
+        try {
+            refreshTokenRepository.save(token);
+            log.info("Refresh token saved successfully for user: {}", user.getEmail());
+        } catch (Exception e) {
+            log.error("Failed to save refresh token for user: {}", user.getEmail(), e);
+        }
     }
 
     /**
-     * Обновляет токен аутентификации.
+     * Обновляет токены для пользователя при успешной валидации refresh токена.
      *
-     * @param request  HTTP-запрос.
-     * @param response HTTP-ответ.
-     * @return Ответ с обновленным токеном.
+     * @param request HTTP-запрос, содержащий старый refresh токен.
+     * @param response HTTP-ответ для отправки нового токена.
+     * @return Новый объект с токенами (access и refresh), если refresh токен валиден.
      */
     @Transactional
-    public ResponseEntity<AuthenticationResponseDto> refreshToken(
-            HttpServletRequest request,
-            HttpServletResponse response) {
-
-        // Получаем заголовок авторизации
+    public ResponseEntity<AuthenticationResponseDto> refreshToken(HttpServletRequest request, HttpServletResponse response) {
+        // Извлекаем заголовок авторизации из запроса
         String authorizationHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
 
-        // Проверяем наличие и формат токена
+        // Проверяем наличие и корректность заголовка авторизации
         if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+            log.warn("Authorization header missing or invalid.");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
         // Извлекаем токен из заголовка
         String token = authorizationHeader.substring(7);
+        log.info("Received refresh token: {}", token);
 
-        // Извлекаем имя пользователя из токена
+        // Извлекаем email пользователя из токена
         String email = jwtService.extractUsername(token);
 
-        // Находим пользователя по имени
+        // Находим пользователя по email
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("No user found"));
+                .orElseThrow(() -> {
+                    log.error("No user found for email: {}", email);
+                    return new UsernameNotFoundException("No user found");
+                });
 
-        // Проверяем валидность токена обновления
+        // Проверяем, является ли refresh токен валидным
         if (jwtService.isValidRefresh(token, user)) {
-
-            // Генерируем новый доступный токен и обновляемый токен
+            // Генерация новых токенов (access и refresh)
             String accessToken = jwtService.generateAccessToken(user);
             String refreshToken = jwtService.generateRefreshToken(user);
 
-            // Заносим старый токен черный список
+            log.info("Generating new access token and refresh token for user: {}", user.getEmail());
+
+            // Добавляем старый токен в черный список
             BlackList blackList = new BlackList();
             blackList.setAccessToken(token);
             blackListRepository.save(blackList);
 
+            // Удаляем старый refresh токен из базы данных
             try {
-                // Удаляем старый токен из базы данных
                 refreshTokenRepository.deleteByToken(token);
+                log.info("Old refresh token deleted successfully.");
             } catch (Exception e) {
-                System.out.println(e.getMessage());
+                log.error("Failed to delete old refresh token: {}", token, e);
             }
-            // Сохраняем новый токен в базе данных
+
+            // Сохраняем новый refresh токен в базе данных
             saveUserToken(refreshToken, user);
 
-            // Возвращаем новый ответ с токенами
+            // Возвращаем новый объект с токенами
             return new ResponseEntity<>(new AuthenticationResponseDto(accessToken, refreshToken), HttpStatus.OK);
         }
 
-        // Удаляем старый токен из базы данных
+        // В случае невалидного refresh токена удаляем его из базы данных
+        log.warn("Invalid refresh token: {}", token);
         refreshTokenRepository.deleteByToken(token);
 
-        // Возвращаем неавторизованный статус
+        // Возвращаем ответ с кодом 401 Unauthorized
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
     }
 }

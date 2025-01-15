@@ -1,18 +1,32 @@
 eureka:
   client:
-    register-with-eureka: false
-
+    service-url:
+      defaultZone : http://localhost:8761/eureka/
 spring:
   application:
     name: api-gateway
 
   cloud:
     gateway:
+      discovery:
+        locator:
+          enabled: true
       routes:
         - id: authentication-service
-          uri: http://localhost:8081
+          uri: lb://AUTHENTICATION-SERVICE
           predicates:
             - Path=/auth/**
+
+        - id: user-service
+          uri: http://localhost:8083
+          predicates:
+            - Path=/user/**
+          filter:
+            name: JwtFilter
+
+security:
+  jwt:
+    secret_key: c39d70463be1a5a035db4cf1f655d59434cdc5c34b29f1c25bc6a21ad3c25e22
 
 logging:
   level:
@@ -20,4 +34,4 @@ logging:
     org.springframework.web: DEBUG
 
 server:
-    port: 8080
+  port: 8222
