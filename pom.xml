@@ -15,6 +15,7 @@
     <module>api-gateway</module>
     <module>eureka-server</module>
     <module>authentication-service</module>
+    <module>task-service</module>
   </modules>
 
   <properties>

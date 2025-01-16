@@ -19,11 +19,14 @@ public class AuthenticationServiceApplication {
     @Bean
     public CommandLineRunner runner(RoleRepository roleRepository) {
         return args -> {
-            if (roleRepository.findByName("USER").isEmpty()) {
-                roleRepository.save(Role.builder().name("USER").build());
+            if (roleRepository.findByName("ROLE_USER").isEmpty()) {
+                roleRepository.save(Role.builder().name("ROLE_USER").build());
             }
-            if (roleRepository.findByName("ADMIN").isEmpty()) {
-                roleRepository.save(Role.builder().name("ADMIN").build());
+            if (roleRepository.findByName("ROLE_ADMIN").isEmpty()) {
+                roleRepository.save(Role.builder().name("ROLE_ADMIN").build());
+            }
+            if (roleRepository.findByName("ROLE_EXECUTOR").isEmpty()) {
+                roleRepository.save(Role.builder().name("ROLE_EXECUTOR").build());
             }
         };
     }

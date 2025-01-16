@@ -29,6 +29,13 @@ public class JwtFilter implements GlobalFilter {
         this.webClientBuilder = webClientBuilder;
     }
 
+    /**
+     * Фильтр для проверки JWT токенов на уровне API Gateway с помощью Auth Service.
+     *
+     * @param exchange Объект Exchange, содержащий информацию о текущем запросе.
+     * @param chain Следующий фильтр в цепочке.
+     * @return Mono<Void> Объект Mono, содержащий результат фильтрации.
+     */
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getURI().getPath();
@@ -57,10 +64,10 @@ public class JwtFilter implements GlobalFilter {
 
         // Проверка токена через Auth Service
         return isValidToken(token)
-                .flatMap(valid -> {
+                .flatMap(valid -> { // Преобразование Mono<Boolean> в Mono<Void>
                     if (!valid) {
                         log.warn("Invalid token: {}", token);
-                        exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                        exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED); // Если токен некорректен, возвращаем статус 401
                         return exchange.getResponse().setComplete();
                     }
 
@@ -69,7 +76,13 @@ public class JwtFilter implements GlobalFilter {
                 });
     }
 
-    // Асинхронный метод для валидации токена с логированием
+    /**
+     * Проверяет валидность JWT токена.
+     * Проверяет наличие и валидность токена в Auth Service.
+     *
+     * @param token JWT токен для проверки.
+     * @return Mono<Boolean>, возвращающее true, если токен валиден, иначе false.
+     */
     private Mono<Boolean> isValidToken(String token) {
         log.debug("Sending token to authentication service for validation: {}", token);
 
@@ -85,7 +98,7 @@ public class JwtFilter implements GlobalFilter {
                 })
                 .toBodilessEntity()  // Получаем только статусный код
                 .map(response -> {
-                    boolean isValid = response.getStatusCode().is2xxSuccessful();
+                    boolean isValid = response.getStatusCode().is2xxSuccessful(); // Проверяем код статуса, если 2xx, то токен валиден
                     log.debug("Token validation response: {}", isValid ? "valid" : "invalid");
                     return isValid;
                 });

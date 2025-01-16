@@ -42,6 +42,15 @@ public class SecurityConfig {
         this.customLogoutHandler = customLogoutHandler;
     }
 
+    /**
+     * Настройка безопасности
+     * Установка эндпоинтов, добавление обработчиков и конфигурации
+     * Настройка фильтров
+     *
+     * @param http HttpSecurity
+     * @return http.build() - объект HttpSecurity
+     * @throws Exception если произошла ошибка
+     */
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 
@@ -54,28 +63,18 @@ public class SecurityConfig {
                             .anyRequest().authenticated();      // Требуем аутентификацию для всех остальных запросов
                 }).userDetailsService(userService)
                 .exceptionHandling(e -> {
-                    e.accessDeniedHandler(accessDeniedHandler); // Обработчик отказа доступа
-                    e.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)); // Входная точка аутентификации
+                    e.accessDeniedHandler(accessDeniedHandler) // Обработчик отказа доступа
+                            .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)); // Входная точка аутентификации
                 })
                 .sessionManagement(session -> session.sessionCreationPolicy(STATELESS)) // Управление сессиями
                 .addFilterBefore(jwtFIlter, UsernamePasswordAuthenticationFilter.class) // Добавление фильтра JWT перед фильтром UsernamePasswordAuthenticationFilter
                 .logout(log -> {
-                    log.logoutUrl("/auth/logout");
-                    log.addLogoutHandler(customLogoutHandler); // Добавление обработчика выхода
-                    log.logoutSuccessHandler((request, response, authentication) ->
-                            SecurityContextHolder.clearContext()); // Очистка контекста безопасности после успешного выхода
+                    log.logoutUrl("/auth/logout")
+                            .addLogoutHandler(customLogoutHandler) // Добавление обработчика выхода
+                            .logoutSuccessHandler((request, response, authentication) ->
+                                    SecurityContextHolder.clearContext()); // Очистка контекста безопасности после успешного выхода
                 });
 
         return http.build();
-    }
-
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
-
-    @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
-        return config.getAuthenticationManager();
     }
 }

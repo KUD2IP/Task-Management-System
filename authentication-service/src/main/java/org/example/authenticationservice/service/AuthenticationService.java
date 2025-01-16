@@ -72,7 +72,7 @@ public class AuthenticationService {
         }
 
         // Поиск роли пользователя (в данном случае роль USER)
-        Role userRole = roleRepository.findByName("USER")
+        Role userRole = roleRepository.findByName("ROLE_USER")
                 .orElseThrow(() -> {
                     log.error("Role USER not found");
                     return new RuntimeException("Role USER not found");

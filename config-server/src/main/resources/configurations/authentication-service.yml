@@ -30,5 +30,11 @@ security:
     access_token_expiration: 3600000 # 1 hours
     refresh_token_expiration: 604800000 # 7 days
 
+logging:
+  level:
+    org.springframework.web: DEBUG
+  file:
+    name: logs/authentication-service.log
+
 server:
     port: 8081

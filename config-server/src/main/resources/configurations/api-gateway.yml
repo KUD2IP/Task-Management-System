@@ -17,12 +17,10 @@ spring:
           predicates:
             - Path=/auth/**
 
-        - id: user-service
-          uri: http://localhost:8083
+        - id: task-service
+          uri: lb://TASK-SERVICE
           predicates:
-            - Path=/user/**
-          filter:
-            name: JwtFilter
+            - Path=/tasks/**
 
 security:
   jwt:
@@ -32,6 +30,8 @@ logging:
   level:
     org.springframework.cloud.gateway: DEBUG
     org.springframework.web: DEBUG
+  file:
+    name: logs/api-gateway.log
 
 server:
   port: 8222
