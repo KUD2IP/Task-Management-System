@@ -11,16 +11,18 @@ import lombok.Setter;
 @NoArgsConstructor
 @Getter
 @Setter
-public class RefreshToken {
+public class Token {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String token;
+    private String accessToken;
+
+    private String refreshToken;
+
+    private boolean loggedOut;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;
-
-    private Long expiryDate;
 }

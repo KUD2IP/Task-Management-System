@@ -6,12 +6,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.authenticationservice.dto.AuthenticationResponseDto;
 import org.example.authenticationservice.dto.LoginRequestDto;
 import org.example.authenticationservice.dto.RegistrationRequestDto;
-import org.example.authenticationservice.entity.BlackList;
-import org.example.authenticationservice.entity.RefreshToken;
+import org.example.authenticationservice.entity.Token;
 import org.example.authenticationservice.entity.Role;
 import org.example.authenticationservice.entity.User;
-import org.example.authenticationservice.repository.BlackListRepository;
-import org.example.authenticationservice.repository.RefreshTokenRepository;
+import org.example.authenticationservice.repository.TokenRepository;
 import org.example.authenticationservice.repository.RoleRepository;
 import org.example.authenticationservice.repository.UserRepository;
 import org.springframework.http.HttpHeaders;
@@ -22,8 +20,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Set;
 
 @Slf4j
@@ -32,26 +30,23 @@ public class AuthenticationService {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
-    private final BlackListRepository blackListRepository;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
-    private final RefreshTokenRepository refreshTokenRepository;
+    private final TokenRepository tokenRepository;
 
     public AuthenticationService(UserRepository userRepository,
                                  RoleRepository roleRepository,
-                                 BlackListRepository blackListRepository,
                                  JwtService jwtService,
                                  PasswordEncoder passwordEncoder,
                                  AuthenticationManager authenticationManager,
-                                 RefreshTokenRepository refreshTokenRepository) {
+                                 TokenRepository tokenRepository) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
-        this.blackListRepository = blackListRepository;
         this.jwtService = jwtService;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
-        this.refreshTokenRepository = refreshTokenRepository;
+        this.tokenRepository = tokenRepository;
     }
 
     /**
@@ -116,7 +111,7 @@ public class AuthenticationService {
         String refreshToken = jwtService.generateRefreshToken(user);
 
         // Сохранение refresh токена в базе данных
-        saveUserToken(refreshToken, user);
+        saveUserToken(accessToken, refreshToken, user);
 
         log.info("Authentication successful for user: {}", user.getEmail());
 
@@ -130,22 +125,43 @@ public class AuthenticationService {
      * @param refreshToken Токен обновления.
      * @param user Пользователь, для которого генерируется токен.
      */
-    private void saveUserToken(String refreshToken, User user) {
+    private void saveUserToken(String accessToken, String refreshToken, User user) {
         log.info("Saving refresh token for user: {}", user.getEmail());
 
         // Создаем объект токена
-        RefreshToken token = new RefreshToken();
-        token.setToken(refreshToken);
+        Token token = new Token();
+        token.setAccessToken(accessToken);
+        token.setRefreshToken(refreshToken);
         token.setUser(user);
-        token.setExpiryDate(jwtService.calculateExpirationDate(refreshToken));  // Рассчитываем время истечения
+        token.setLoggedOut(false);
 
         // Сохраняем токен в базе данных
         try {
-            refreshTokenRepository.save(token);
-            log.info("Refresh token saved successfully for user: {}", user.getEmail());
+            tokenRepository.save(token);
+            log.info("Access and refresh tokens saved successfully for user: {}", user.getEmail());
         } catch (Exception e) {
-            log.error("Failed to save refresh token for user: {}", user.getEmail(), e);
+            log.error("Failed to save tokens for user: {}", user.getEmail(), e);
         }
+    }
+
+    /**
+     * Метод отзывает все действительные токены для данного пользователя.
+     *
+     * @param user Пользователь, для которого нужно отменить токены.
+     */
+    private void revokeAllToken(User user) {
+        // Получаем список всех действительных токенов для данного пользователя
+        List<Token> validTokens = tokenRepository.findAllAccessTokenByUser(user.getId());
+
+        // Если список не пустой, то отменяем все токены
+        if(!validTokens.isEmpty()){
+            validTokens.forEach(t ->{
+                // Устанавливаем признак "отменен" для каждого токена
+                t.setLoggedOut(true);
+            });
+        }
+        // Сохраняем измененные токены в базе данных
+        tokenRepository.saveAll(validTokens);
     }
 
     /**
@@ -155,7 +171,6 @@ public class AuthenticationService {
      * @param response HTTP-ответ для отправки нового токена.
      * @return Новый объект с токенами (access и refresh), если refresh токен валиден.
      */
-    @Transactional
     public ResponseEntity<AuthenticationResponseDto> refreshToken(HttpServletRequest request, HttpServletResponse response) {
         // Извлекаем заголовок авторизации из запроса
         String authorizationHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
@@ -188,29 +203,16 @@ public class AuthenticationService {
 
             log.info("Generating new access token and refresh token for user: {}", user.getEmail());
 
-            // Добавляем старый токен в черный список
-            BlackList blackList = new BlackList();
-            blackList.setAccessToken(token);
-            blackListRepository.save(blackList);
+            //Отзываем все действительные токены
+            revokeAllToken(user);
+            log.info("All tokens revoked for user: {}", user.getEmail());
 
-            // Удаляем старый refresh токен из базы данных
-            try {
-                refreshTokenRepository.deleteByToken(token);
-                log.info("Old refresh token deleted successfully.");
-            } catch (Exception e) {
-                log.error("Failed to delete old refresh token: {}", token, e);
-            }
-
-            // Сохраняем новый refresh токен в базе данных
-            saveUserToken(refreshToken, user);
+            // Сохраняем новые токены в базе данных
+            saveUserToken(accessToken, refreshToken, user);
 
             // Возвращаем новый объект с токенами
             return new ResponseEntity<>(new AuthenticationResponseDto(accessToken, refreshToken), HttpStatus.OK);
         }
-
-        // В случае невалидного refresh токена удаляем его из базы данных
-        log.warn("Invalid refresh token: {}", token);
-        refreshTokenRepository.deleteByToken(token);
 
         // Возвращаем ответ с кодом 401 Unauthorized
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();

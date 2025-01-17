@@ -6,10 +6,8 @@ import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
@@ -43,8 +41,13 @@ public class JwtFilter implements GlobalFilter {
         // Логируем путь запроса
         log.debug("Request path: {}", path);
 
-        // Пропускаем запросы на регистрацию и другие публичные маршруты
-        if (path.startsWith("/auth/")) {
+        // Пропускаем запросы на регистрацию и доступ к Swagger
+        if (path.startsWith("/api/v1/auth/")
+                || path.contains("/swagger-ui")
+                || path.contains("/v3/api-docs")
+                || path.contains("/swagger-resources")
+                || path.contains("/actuator")
+                || path.contains("/webjars")){
             log.debug("Public route detected, skipping token validation: {}", path);
             return chain.filter(exchange);
         }
@@ -89,7 +92,7 @@ public class JwtFilter implements GlobalFilter {
         return webClientBuilder.baseUrl("http://localhost:8081")
                 .build()
                 .post()
-                .uri("/auth/validate-token")
+                .uri("api/v1/auth/validate-token")
                 .bodyValue(new TokenRequest(token)) // Передаем токен в заголовке
                 .retrieve()
                 .onStatus(status -> status.isError(), response -> {

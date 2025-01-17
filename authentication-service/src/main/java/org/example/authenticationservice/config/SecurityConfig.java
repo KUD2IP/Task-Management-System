@@ -1,5 +1,6 @@
 package org.example.authenticationservice.config;
 
+import lombok.extern.slf4j.Slf4j;
 import org.example.authenticationservice.filter.JwtFilter;
 import org.example.authenticationservice.handler.CustomAccessDeniedHandler;
 import org.example.authenticationservice.handler.CustomLogoutHandler;
@@ -23,6 +24,7 @@ import static org.springframework.security.config.http.SessionCreationPolicy.STA
 
 @Configuration
 @EnableWebSecurity
+@Slf4j
 public class SecurityConfig {
 
     private final JwtFilter jwtFIlter;
@@ -57,8 +59,14 @@ public class SecurityConfig {
         // Настраиваем авторизацию запросов
         http.csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> {
-                    auth.requestMatchers("/auth/**")
-                            .permitAll()    // Разрешаем все запросы к этим URL
+                    auth.requestMatchers(
+                            "/auth/**",
+                            "/v3/api-docs",
+                            "/v3/api-docs/**",
+                            "/swagger-ui/**",
+                            "/swagger-resources/**",
+                            "/actuator/**",
+                            "swagger-ui.html").permitAll()    // Разрешаем все запросы к этим URL
                             .requestMatchers("/admin/**").hasAuthority("ADMIN")     // Разрешаем запросы только для администратора
                             .anyRequest().authenticated();      // Требуем аутентификацию для всех остальных запросов
                 }).userDetailsService(userService)
@@ -74,7 +82,6 @@ public class SecurityConfig {
                             .logoutSuccessHandler((request, response, authentication) ->
                                     SecurityContextHolder.clearContext()); // Очистка контекста безопасности после успешного выхода
                 });
-
         return http.build();
     }
 }

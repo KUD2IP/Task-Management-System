@@ -2,6 +2,7 @@ package org.example.authenticationservice.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.example.authenticationservice.dto.AuthenticationResponseDto;
 import org.example.authenticationservice.dto.LoginRequestDto;
 import org.example.authenticationservice.dto.RegistrationRequestDto;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/auth")
+@Slf4j
 public class AuthController {
 
     private final AuthenticationService authenticationService;
@@ -41,6 +43,7 @@ public class AuthController {
     public ResponseEntity<?> register(
             @RequestBody RegistrationRequestDto registrationDto
     ) {
+        log.info("Registration request: {}", registrationDto);
         authenticationService.register(registrationDto);
 
         return ResponseEntity.accepted().build();

@@ -34,4 +34,15 @@ logging:
         name: logs/task-service.log
 
 server:
+    servlet:
+        context-path: /api/v1
+
     port: 8082
+
+springdoc:
+    api-docs:
+        enabled: true
+        path: /tasks/v3/api-docs
+    swagger-ui:
+        enabled: true
+        path: /tasks/swagger-ui.html

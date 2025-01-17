@@ -7,8 +7,7 @@ import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import org.example.authenticationservice.entity.Role;
 import org.example.authenticationservice.entity.User;
-import org.example.authenticationservice.repository.BlackListRepository;
-import org.example.authenticationservice.repository.RefreshTokenRepository;
+import org.example.authenticationservice.repository.TokenRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
@@ -32,13 +31,11 @@ public class JwtService {
     @Value("${security.jwt.refresh_token_expiration}")
     private long refreshTokenExpiration;
 
-    private final RefreshTokenRepository refreshTokenRepository;
-    private final BlackListRepository blackListRepository;
+    private final TokenRepository tokenRepository;
 
 
-    public JwtService(RefreshTokenRepository refreshTokenRepository, BlackListRepository blackListRepository) {
-        this.refreshTokenRepository = refreshTokenRepository;
-        this.blackListRepository = blackListRepository;
+    public JwtService(TokenRepository tokenRepository) {
+        this.tokenRepository = tokenRepository;
     }
 
     /**
@@ -58,31 +55,19 @@ public class JwtService {
             throw new IllegalArgumentException("Refresh token cannot access protected resource");
         }
 
+        boolean isValidAccessToken = tokenRepository.findByAccessToken(token)
+                .map(t -> !t.isLoggedOut()).orElse(false);
+
         // Проверка имени пользователя и валидности токена
         String username = extractUsername(token);
         boolean isValid = username.equals(user.getUsername())
                 && !isTokenExpired(token)
-                && !isTokenInBlacklist(token);
+                && isValidAccessToken;
 
         log.debug("Access token valid: {}", isValid);
         return isValid;
     }
 
-    /**
-     * Проверяет, находится ли токен в черном списке.
-     *
-     * @param token Токен для проверки.
-     * @return true, если токен в черном списке, иначе false.
-     */
-    private boolean isTokenInBlacklist(String token) {
-        String tokenType = extractClaim(token, claims -> claims.get("token_type", String.class));
-        if ("refresh".equals(tokenType)) {
-            return false; // Refresh токены не проверяются в черном списке для доступа к защищенному ресурсу
-        }
-        boolean isInBlacklist = blackListRepository.existsByAccessToken(token);
-        log.debug("Token in blacklist: {}", isInBlacklist);
-        return isInBlacklist;
-    }
 
     /**
      * Проверяет валидность refresh токена.
@@ -101,11 +86,16 @@ public class JwtService {
             throw new IllegalArgumentException("Access token cannot refresh tokens");
         }
 
+        // Проверяем, есть ли в базе данных токен обновления с указанным значением
+        boolean isValidRefreshToken = tokenRepository.findByRefreshToken(token)
+                .map(t -> !t.isLoggedOut()).orElse(false);
+
         // Проверка имени пользователя и валидности refresh токена
         String username = extractUsername(token);
+
         boolean isValid = username.equals(user.getUsername())
                 && !isTokenExpired(token)
-                && refreshTokenRepository.findByToken(token).isPresent();
+                && isValidRefreshToken;
 
         log.debug("Refresh token valid: {}", isValid);
         return isValid;
