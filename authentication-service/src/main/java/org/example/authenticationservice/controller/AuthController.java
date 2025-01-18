@@ -10,10 +10,13 @@ import org.example.authenticationservice.dto.TokenRequest;
 import org.example.authenticationservice.service.AuthenticationService;
 import org.example.authenticationservice.service.JwtService;
 import org.example.authenticationservice.service.UserService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/auth")
@@ -32,7 +35,6 @@ public class AuthController {
         this.jwtService = jwtService;
     }
 
-
     /**
      * Регистрация нового пользователя.
      *
@@ -40,41 +42,81 @@ public class AuthController {
      * @return ответ о результате регистрации
      */
     @PostMapping("/registration")
-    public ResponseEntity<?> register(
-            @RequestBody RegistrationRequestDto registrationDto
-    ) {
+    public ResponseEntity<?> register(@RequestBody RegistrationRequestDto registrationDto) {
         log.info("Registration request: {}", registrationDto);
-        authenticationService.register(registrationDto);
-
-        return ResponseEntity.accepted().build();
+        try {
+            authenticationService.register(registrationDto);
+            return ResponseEntity.accepted().build(); // Возвращаем статус 202 Accepted
+        } catch (Exception e) {
+            log.error("Registration failed: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Registration failed: " + e.getMessage());
+        }
     }
 
+    /**
+     * Аутентификация пользователя.
+     *
+     * @param request данные для входа
+     * @return токен доступа
+     */
     @PostMapping("/login")
-    public ResponseEntity<AuthenticationResponseDto> authenticate(
-            @RequestBody LoginRequestDto request
-    ) {
-        return ResponseEntity.ok(authenticationService.authenticate(request));
+    public ResponseEntity<AuthenticationResponseDto> authenticate(@RequestBody LoginRequestDto request) {
+        log.info("Login request: {}", request.getEmail());
+        try {
+            return ResponseEntity.ok(authenticationService.authenticate(request));
+        } catch (Exception e) {
+            log.error("Authentication failed: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(null);
+        }
     }
 
+    /**
+     * Обновление токена доступа.
+     *
+     * @param request HTTP-запрос
+     * @param response HTTP-ответ
+     * @return новый токен доступа
+     */
     @PostMapping("/refresh_token")
     public ResponseEntity<AuthenticationResponseDto> refreshToken(
             HttpServletRequest request,
-            HttpServletResponse response
-    ) {
-        return authenticationService.refreshToken(request, response);
+            HttpServletResponse response) {
+        log.info("Refresh token request");
+        try {
+            return authenticationService.refreshToken(request, response);
+        } catch (Exception e) {
+            log.error("Token refresh failed: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(null);
+        }
     }
 
+    /**
+     * Валидация токена доступа.
+     *
+     * @param tokenRequest запрос с токеном
+     * @return true, если токен валиден, иначе false
+     */
     @PostMapping("/validate-token")
     public ResponseEntity<Boolean> validateToken(@RequestBody TokenRequest tokenRequest) {
+        log.info("Validate token request");
+        try {
+            String username = jwtService.extractUsername(tokenRequest.getToken());
 
-        String username = jwtService.extractUsername(tokenRequest.getToken());
+            if (username == null) {
+                log.warn("Token validation failed: username not found");
+                return ResponseEntity.ok(false);
+            }
 
-        if (username == null) {
+            UserDetails userDetails = userService.loadUserByUsername(username);
+            boolean isValid = jwtService.isAccessValid(tokenRequest.getToken(), userDetails);
+            log.info("Token is valid: {}", isValid);
+            return ResponseEntity.ok(isValid);
+        } catch (Exception e) {
+            log.error("Token validation failed: {}", e.getMessage(), e);
             return ResponseEntity.ok(false);
         }
-
-        UserDetails userDetails = userService.loadUserByUsername(username);
-
-        return ResponseEntity.ok(jwtService.isAccessValid(tokenRequest.getToken(), userDetails));
     }
 }

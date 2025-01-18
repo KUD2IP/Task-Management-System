@@ -222,8 +222,9 @@ public class JwtService {
      */
     private String generateToken(User user, long expiryTime, String tokenType) {
         JwtBuilder builder = Jwts.builder()
-                .subject(user.getUsername())  // Установка имени пользователя
+                .subject(user.getUsername())  // Установка email пользователя
                 .claim("token_type", tokenType)  // Установка типа токена
+                .claim("name", user.getName())  // Установка имени пользователя
                 .issuedAt(new Date(System.currentTimeMillis()))  // Время выпуска токена
                 .expiration(new Date(System.currentTimeMillis() + expiryTime))  // Время истечения токена
                 .claims(Map.of(

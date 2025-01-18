@@ -27,16 +27,15 @@ public class SecurityConfig {
         http
             .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests((requests) ->
-                    requests.requestMatchers("/tasks/admin/**").hasRole("ADMIN")
-                            .requestMatchers("/tasks/user/**").hasAnyRole("USER", "ADMIN")
-                            .requestMatchers("/tasks/executor/**").hasAnyRole("EXECUTOR", "ADMIN")
-                            .requestMatchers(
+                    requests.requestMatchers(
                                     "/tasks/v3/api-docs",
                                     "/tasks/v3/api-docs/**",
                                     "/tasks/swagger-ui/**",
                                     "/tasks/swagger-resources/**",
                                     "/tasks/actuator/**",
                                     "/tasks/swagger-ui.html").permitAll()
+                            .requestMatchers("/tasks/status/**").hasAnyRole("ADMIN", "USER_EXECUTOR")
+                            .requestMatchers("/tasks/**").hasRole("ADMIN")
                             .anyRequest().authenticated()
             ).sessionManagement(session -> session.sessionCreationPolicy(STATELESS))
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
