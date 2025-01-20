@@ -89,7 +89,7 @@ public class JwtFilter implements GlobalFilter {
     private Mono<Boolean> isValidToken(String token) {
         log.debug("Sending token to authentication service for validation: {}", token);
 
-        return webClientBuilder.baseUrl("http://localhost:8081")
+        return webClientBuilder.baseUrl("http://authentication-service:8081")
                 .build()
                 .post()
                 .uri("api/v1/auth/validate-token")

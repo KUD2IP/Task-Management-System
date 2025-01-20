@@ -1,6 +1,6 @@
 eureka:
     instance:
-        hostname: eureka-server
+        hostname: task-service
     client:
         service-url:
             defaultZone: http://eureka-server:8761/eureka

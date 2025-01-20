@@ -108,7 +108,7 @@ public class UserService {
         String headers = request.getHeader(HttpHeaders.AUTHORIZATION);
         HttpEntity<String> entity = new HttpEntity<>(headers);
         //Запрос на обновление executor роли
-        String url = String.format("http://localhost:8222/api/v1/auth/executor/%s", userId);
+        String url = String.format("http://authentication-service:8222/api/v1/auth/executor/%s", userId);
         return restTemplate.postForEntity(url, null, String.class);
     }
 
@@ -124,7 +124,7 @@ public class UserService {
         String headers = request.getHeader(HttpHeaders.AUTHORIZATION);
         HttpEntity<String> entity = new HttpEntity<>(headers);
         //Запрос на получение обновленного пользователя
-        String url = String.format("http://localhost:8222/api/v1/auth/executor/%s", userId);
+        String url = String.format("http://authentication-service:a:8222/api/v1/auth/executor/%s", userId);
         log.info("Updating executor credentials: {}", url);
         return restTemplate.getForEntity(url, UserRequestDto.class);
     }
