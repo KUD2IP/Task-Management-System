@@ -7,6 +7,7 @@ import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import org.example.authenticationservice.entity.Role;
 import org.example.authenticationservice.entity.User;
+import org.example.authenticationservice.exception.InvalidTokenException;
 import org.example.authenticationservice.repository.TokenRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -52,7 +53,7 @@ public class JwtService {
         String tokenType = extractClaim(token, claims -> claims.get("token_type", String.class));
         if ("refresh".equals(tokenType)) {
             log.warn("Refresh token cannot access protected resource.");
-            throw new IllegalArgumentException("Refresh token cannot access protected resource");
+            throw new InvalidTokenException("Refresh token cannot access protected resource");
         }
 
         boolean isValidAccessToken = tokenRepository.findByAccessToken(token)
@@ -83,7 +84,7 @@ public class JwtService {
         String tokenType = extractClaim(token, claims -> claims.get("token_type", String.class));
         if ("access".equals(tokenType)) {
             log.warn("Access token cannot refresh tokens.");
-            throw new IllegalArgumentException("Access token cannot refresh tokens");
+            throw new InvalidTokenException("Access token cannot refresh tokens");
         }
 
         // Проверяем, есть ли в базе данных токен обновления с указанным значением
@@ -115,7 +116,7 @@ public class JwtService {
             return username;
         } catch (Exception e) {
             log.error("Failed to extract username from token.", e);
-            throw new IllegalArgumentException("Invalid token or username not found", e);
+            throw new InvalidTokenException("Invalid token or username not found");
         }
     }
 
@@ -145,7 +146,7 @@ public class JwtService {
             return expired;
         } catch (Exception e) {
             log.error("Failed to extract expiration from token.", e);
-            throw new IllegalArgumentException("Invalid token", e);
+            throw new InvalidTokenException("Invalid token");
         }
     }
 
@@ -162,7 +163,7 @@ public class JwtService {
             return expiration;
         } catch (Exception e) {
             log.error("Failed to extract expiration from token.", e);
-            throw new IllegalArgumentException("Invalid token or expired", e);
+            throw new InvalidTokenException("Invalid token or expired");
         }
     }
 
@@ -186,7 +187,7 @@ public class JwtService {
             return claims;
         } catch (JwtException e) {
             log.error("Invalid JWT token or signature.", e);
-            throw new IllegalArgumentException("Invalid JWT token", e);
+            throw new InvalidTokenException("Invalid JWT token");
         }
     }
 
@@ -247,13 +248,4 @@ public class JwtService {
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    /**
-     * Рассчитывает время истечения refresh токена.
-     *
-     * @param refreshToken Токен для расчета времени истечения.
-     * @return Время истечения в миллисекундах.
-     */
-    public Long calculateExpirationDate(String refreshToken) {
-        return extractExpiration(refreshToken).getTime() - new Date().getTime();
-    }
 }

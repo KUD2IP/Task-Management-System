@@ -19,6 +19,15 @@ public class CustomLogoutHandler implements LogoutHandler {
         this.tokenRepository = tokenRepository;
     }
 
+
+    /**
+     * Метод для выхода пользователя из системы.
+     * Обрабатывает входящие запросы и обнуляет состояние токена в хранилище.
+     *
+     * @param request - запрос
+     * @param response - ответ
+     * @param authentication - аутентификация
+     */
     @Override
     public void logout(HttpServletRequest request,
                        HttpServletResponse response,

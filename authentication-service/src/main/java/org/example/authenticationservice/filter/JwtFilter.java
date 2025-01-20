@@ -30,6 +30,18 @@ public class JwtFilter extends OncePerRequestFilter {
         this.userService = userService;
     }
 
+
+    /**
+     *  Фильтр, который обрабатывает запросы, содержащие JWT-токен. Если запрос содержит JWT-токен,
+     *  он проверяется на валидность и добавляется к запросу пользователя. Если токен недействителен,
+     *  запрос переходит в следующий фильтр.
+     *
+     * @param request - запрос
+     * @param response - ответ
+     * @param filterChain - цепочка фильтров
+     * @throws ServletException - если произошла ошибка выполнения сервлета
+     * @throws IOException - если произошла ошибка ввода-вывода
+     */
     @Override
     protected void doFilterInternal(
             @NonNull HttpServletRequest request,

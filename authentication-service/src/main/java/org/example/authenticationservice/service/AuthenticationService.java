@@ -9,6 +9,9 @@ import org.example.authenticationservice.dto.RegistrationRequestDto;
 import org.example.authenticationservice.entity.Token;
 import org.example.authenticationservice.entity.Role;
 import org.example.authenticationservice.entity.User;
+import org.example.authenticationservice.exception.RoleNotFoundException;
+import org.example.authenticationservice.exception.TokenSaveException;
+import org.example.authenticationservice.exception.UserNotFoundException;
 import org.example.authenticationservice.repository.TokenRepository;
 import org.example.authenticationservice.repository.RoleRepository;
 import org.example.authenticationservice.repository.UserRepository;
@@ -21,6 +24,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -63,21 +67,23 @@ public class AuthenticationService {
         // Поиск пользователя по email
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
             log.error("User with email {} already exists", request.getEmail());
-            throw new RuntimeException("User with email " + request.getEmail() + " already exists");
+            throw new UserNotFoundException("User with email " + request.getEmail() + " already exists");
         }
 
         // Поиск роли пользователя (в данном случае роль USER)
         Role userRole = roleRepository.findByName("ROLE_USER")
                 .orElseThrow(() -> {
                     log.error("Role USER not found");
-                    return new RuntimeException("Role USER not found");
+                    return new RoleNotFoundException("Role USER not found");
                 });
 
+        Set<Role> roles = new HashSet<>(user.getRoles());
+        roles.add(userRole);
         // Заполнение данных пользователя
         user.setEmail(request.getEmail());
         user.setName(request.getName());
         user.setPassword(passwordEncoder.encode(request.getPassword()));  // Хеширование пароля
-        user.setRoles(Set.of(userRole));  // Устанавливаем роль
+        user.setRoles(roles);  // Устанавливаем роль
 
         // Сохранение нового пользователя в базе данных
         user = userRepository.save(user);
@@ -103,7 +109,7 @@ public class AuthenticationService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> {
                     log.error("User not found with email: {}", request.getEmail());
-                    return new RuntimeException("User not found");
+                    return new UserNotFoundException("User not found");
                 });
 
         // Генерация токенов
@@ -139,8 +145,9 @@ public class AuthenticationService {
         try {
             tokenRepository.save(token);
             log.info("Access and refresh tokens saved successfully for user: {}", user.getEmail());
-        } catch (Exception e) {
+        } catch (TokenSaveException e) {
             log.error("Failed to save tokens for user: {}", user.getEmail(), e);
+            throw new TokenSaveException("Failed to save tokens for user: " + user.getEmail());
         }
     }
 
@@ -216,5 +223,53 @@ public class AuthenticationService {
 
         // Возвращаем ответ с кодом 401 Unauthorized
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+    }
+
+    /**
+     * Метод для назначения роли EXECUTOR пользователю.
+     *
+     * @param userId ID пользователя.
+     */
+    public void assignRoleToUser(Long userId) {
+
+        // Поиск пользователя по ID
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+
+        // Поиск роли пользователя (в данном случае роль EXECUTOR)
+        Role userRole = roleRepository.findByName("ROLE_EXECUTOR")
+                .orElseThrow(() -> {
+                    log.error("Role EXECUTOR not found");
+                    return new RoleNotFoundException("Role EXECUTOR not found");
+                });
+
+        // Очистка ролей
+        Set<Role> roles = new HashSet<>(user.getRoles());
+        roles.clear();
+
+        // Добавление роли EXECUTOR
+        roles.add(userRole);
+        user.setRoles(roles);
+
+        // Сохранение изменений
+        userRepository.save(user);
+
+        // Генерация новых токенов для пользователя
+        // Проверка наличия действительных токенов
+        if(!tokenRepository.findAllAccessTokenByUser(user.getId()).isEmpty()){
+            // Генерация новых токенов (access и refresh)
+            String accessToken = jwtService.generateAccessToken(user);
+            String refreshToken = jwtService.generateRefreshToken(user);
+
+            log.info("Generating new access token and refresh token for user: {}", user.getEmail());
+
+            //Отзываем все действительные токены
+            revokeAllToken(user);
+            log.info("All tokens revoked for user: {}", user.getEmail());
+            // Сохраняем новые токены в базе данных
+            saveUserToken(accessToken, refreshToken, user);
+        }
+
     }
 }

@@ -6,9 +6,8 @@ import org.example.taskservice.dto.CommentResponseDto;
 import org.example.taskservice.dto.TaskRequestDto;
 import org.example.taskservice.dto.TaskResponseDto;
 import org.example.taskservice.entity.*;
-import org.example.taskservice.repository.TaskRepository;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.core.convert.ConversionService;
+import org.example.taskservice.exeception.InvalidCommentDataException;
+import org.example.taskservice.exeception.InvalidTaskDataException;
 import org.springframework.stereotype.Service;
 
 import java.util.stream.Collectors;
@@ -46,12 +45,13 @@ public class MapperService {
         TaskPriority priority = taskRequestDto.getPriority();
         // Если приоритет не передан, оставляем старое значение
         if (taskRequestDto.getPriority() == null && oldTask.getPriority() == null) {
-            throw new IllegalArgumentException("Priority cannot be null");
+            throw new InvalidTaskDataException("Priority cannot be null");
         }
 
         log.info("Task name: {}, description: {}, status: {}, priority: {}", name, description, status, priority);
         // Создаем и возвращаем обновленную задачу
         return Task.builder()
+                .id(oldTask.getId())
                 .name(name)
                 .description(description)
                 .status(status)
@@ -71,7 +71,7 @@ public class MapperService {
 
         // Если поле не передано, выбрасываем исключение
         if(commentRequestDto.getContent() == null || commentRequestDto.getContent().isEmpty()) {
-            throw new IllegalArgumentException("Content cannot be null or empty");
+            throw new InvalidCommentDataException("Content cannot be null or empty");
         }
 
         // Создаем и возвращаем обновленный комментарий
@@ -88,29 +88,36 @@ public class MapperService {
      */
     public TaskResponseDto convertToTaskResponseDto(Task task) {
         return TaskResponseDto.builder()
-                .id(task.getId())
-                .name(task.getName())
-                .description(task.getDescription())
-                .status(task.getStatus())
-                .priority(task.getPriority())
-                .authorId(task.getAuthor().getId())
-                .authorName(task.getAuthor().getName())
+                .id(task.getId()) // Идентификатор задачи
+                .name(task.getName()) // Название задачи
+                .description(task.getDescription()) // Описание задачи
+                .status(task.getStatus()) // Статус задачи
+                .priority(task.getPriority())  // Приоритет задачи
+                .authorId(task.getAuthor().getId()) // ID автора задачи
+                .authorName(task.getAuthor().getName()) // Имя автора задачи
                 .executorId(task.getExecutors() != null
                         ? task.getExecutors().stream().map(User::getId).collect(Collectors.toSet())
-                        : null)
+                        : null) // ID исполнителя
                 .executorName(task.getExecutors() != null
                         ? task.getExecutors().stream().map(User::getName).collect(Collectors.toSet())
-                        : null)
-                .comments(task.getComments().stream().map(this::convertToCommentResponseDto).collect(Collectors.toSet()))
+                        : null) // Имя исполнителя
+                .comments(task.getComments().stream().map(this::convertToCommentResponseDto).collect(Collectors.toSet())) // Комментарии
                 .build();
     }
 
-    private CommentResponseDto convertToCommentResponseDto(Comment comment) {
+
+    /**
+     * Преобразование сущности Comment в DTO CommentResponseDto.
+     *
+     * @param comment комментарий
+     * @return CommentResponseDto
+     */
+    public CommentResponseDto convertToCommentResponseDto(Comment comment) {
         return CommentResponseDto.builder()
-                .id(comment.getId())
-                .content(comment.getContent())
-                .authorId(comment.getAuthor().getId())
-                .authorName(comment.getAuthor().getName())
+                .id(comment.getId()) // Идентификатор комментария
+                .content(comment.getContent()) // Текст комментария
+                .authorId(comment.getAuthor().getId()) // ID автора комментария
+                .authorName(comment.getAuthor().getName()) // Имя автора комментария
                 .build();
     }
 }

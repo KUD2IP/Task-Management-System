@@ -1,6 +1,7 @@
 package org.example.authenticationservice.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Builder;
 import lombok.Data;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotEmpty;
@@ -9,6 +10,7 @@ import jakarta.validation.constraints.Size;
 
 @Data
 @Schema(name = "RegistrationRequestDto", description = "DTO для регистрации пользователя")
+@Builder
 public class RegistrationRequestDto {
 
     @NotEmpty(message = "Name cannot be empty")

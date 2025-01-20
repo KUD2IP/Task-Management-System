@@ -52,6 +52,7 @@ public class JwtFilter extends OncePerRequestFilter {
         List<SimpleGrantedAuthority> authorities =  role.stream()
                 .map(SimpleGrantedAuthority::new)
                 .toList();
+        log.info("authorities: {}", authorities);
         return new UsernamePasswordAuthenticationToken(username, null, authorities);
     }
 }

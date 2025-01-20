@@ -23,6 +23,10 @@ public class BeansConfig {
         return config.getAuthenticationManager();
     }
 
+    /**
+     * Настройка CORS
+     * @return WebMvcConfigurer
+     */
     @Bean
     public WebMvcConfigurer corsConfigurer() {
         return new WebMvcConfigurer() {

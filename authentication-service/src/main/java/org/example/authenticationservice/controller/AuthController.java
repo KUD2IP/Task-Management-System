@@ -3,20 +3,16 @@ package org.example.authenticationservice.controller;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.example.authenticationservice.dto.AuthenticationResponseDto;
-import org.example.authenticationservice.dto.LoginRequestDto;
-import org.example.authenticationservice.dto.RegistrationRequestDto;
-import org.example.authenticationservice.dto.TokenRequest;
+import org.example.authenticationservice.dto.*;
 import org.example.authenticationservice.service.AuthenticationService;
 import org.example.authenticationservice.service.JwtService;
 import org.example.authenticationservice.service.UserService;
+import org.example.authenticationservice.service.UserServiceImpl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/auth")
@@ -26,13 +22,15 @@ public class AuthController {
     private final AuthenticationService authenticationService;
     private final UserService userService;
     private final JwtService jwtService;
+    private final UserServiceImpl userServiceImpl;
 
     public AuthController(AuthenticationService authenticationService,
                           UserService userService,
-                          JwtService jwtService) {
+                          JwtService jwtService, UserServiceImpl userServiceImpl) {
         this.authenticationService = authenticationService;
         this.userService = userService;
         this.jwtService = jwtService;
+        this.userServiceImpl = userServiceImpl;
     }
 
     /**
@@ -118,5 +116,32 @@ public class AuthController {
             log.error("Token validation failed: {}", e.getMessage(), e);
             return ResponseEntity.ok(false);
         }
+    }
+
+    /**
+     * Выдача роли исполнителю.
+     *
+     * @param userId идентификатор пользователя
+     * @return ответ о результате выдачи роли
+     */
+    @PostMapping("/executor/{userId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<String> assignExecutor(
+            @PathVariable Long userId) {
+        authenticationService.assignRoleToUser(userId);
+        return ResponseEntity.ok("Executor assigned successfully");
+    }
+
+    /**
+     * Поиск пользователя по идентификатору.
+     *
+     * @param userId идентификатор пользователя
+     * @return пользователь
+     */
+    @GetMapping("/executor/{userId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<UserResponseDto> getExecutor(
+            @PathVariable Long userId) {
+        return ResponseEntity.ok(userServiceImpl.getUserById(userId));
     }
 }

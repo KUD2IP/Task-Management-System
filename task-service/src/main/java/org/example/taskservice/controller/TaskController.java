@@ -3,10 +3,9 @@ package org.example.taskservice.controller;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.example.taskservice.dto.CommentRequestDto;
+import org.example.taskservice.dto.CommentResponseDto;
 import org.example.taskservice.dto.TaskRequestDto;
 import org.example.taskservice.dto.TaskResponseDto;
-import org.example.taskservice.entity.Comment;
-import org.example.taskservice.entity.Task;
 import org.example.taskservice.entity.TaskPriority;
 import org.example.taskservice.entity.TaskStatus;
 import org.example.taskservice.service.TaskService;
@@ -16,8 +15,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/tasks")
@@ -39,7 +36,7 @@ public class TaskController {
      * @return - ID созданной задачи
      * @throws IOException - исключение ввода-вывода
      */
-    @PostMapping("/create")
+    @PostMapping("/admin/create")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Long> createTask(
             @RequestBody TaskRequestDto taskRequestDto,
@@ -63,7 +60,7 @@ public class TaskController {
      * @param taskRequestDto - DTO задачи
      * @return - ID обновленной задачи
      */
-    @PutMapping("/{taskId}")
+    @PutMapping("/admin/{taskId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Long> updateTask(
             @PathVariable Long taskId,
@@ -85,14 +82,15 @@ public class TaskController {
      * @param status - новый статус
      * @return - идентификатор обновленной задачи
      */
-    @PatchMapping("/{taskId}/status")
+    @PatchMapping("/executors/{taskId}/status")
     @PreAuthorize("hasAnyRole('ADMIN', 'USER_EXECUTOR')")
     public ResponseEntity<Long> updateTaskStatus(
             @PathVariable Long taskId,
-            @RequestParam TaskStatus status) {
+            @RequestParam TaskStatus status,
+            HttpServletRequest request) throws IOException {
 
         log.info("Updating status: {} for task: {}", status, taskId);
-        Long updatedTaskId = taskService.updateTaskStatus(taskId, status);
+        Long updatedTaskId = taskService.updateTaskStatus(taskId, status, request);
         log.info("Task status updated successfully with ID: {}", updatedTaskId);
 
         return ResponseEntity.ok(updatedTaskId);
@@ -107,7 +105,7 @@ public class TaskController {
      * @param priority - новый приоритет
      * @return -
      */
-    @PatchMapping("/{taskId}/priority")
+    @PatchMapping("/admin/{taskId}/priority")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Long> updateTaskPriority(
             @PathVariable Long taskId,
@@ -122,10 +120,13 @@ public class TaskController {
 
 
     // Назначение исполнителя задачи - доступно только администратору
-    @PatchMapping("/executor/{userId}/{taskId}")
+    @PatchMapping("/admin/executor/{userId}/{taskId}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Long> updateTaskExecutor(@PathVariable Long taskId, @PathVariable Long userId) {
-        Long task = taskService.updateTaskExecutor(taskId, userId);
+    public ResponseEntity<Long> updateTaskExecutor(
+            @PathVariable Long taskId,
+            @PathVariable Long userId,
+            HttpServletRequest request) {
+        Long task = taskService.updateTaskExecutor(taskId, userId, request);
         return ResponseEntity.ok(task);
     }
 
@@ -137,7 +138,7 @@ public class TaskController {
      * @param taskId - идентификатор задачи
      * @return - сообщение об успешном удалении
      */
-    @DeleteMapping("/{taskId}")
+    @DeleteMapping("/admin/{taskId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> deleteTask(@PathVariable Long taskId) {
         taskService.deleteTask(taskId);
@@ -154,8 +155,8 @@ public class TaskController {
      * @return - сообщение об успешном добавлении
      * @throws IOException - исключение
      */
-    @PatchMapping("/{taskId}/comment")
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER_EXECUTOR')")
+    @PatchMapping("/executors/{taskId}/comment")
+    @PreAuthorize("hasAnyRole('ADMIN', 'EXECUTOR')")
     public ResponseEntity<String> addComment(
             @PathVariable Long taskId,
             @RequestBody CommentRequestDto commentRequestDto,
@@ -179,7 +180,6 @@ public class TaskController {
      * @return - задачи по автору
      */
     @GetMapping("/author/{userId}")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Page<TaskResponseDto>> getTasksByAuthor(
             @PathVariable Long userId,
             @RequestParam(defaultValue = "0") int page,
@@ -187,44 +187,94 @@ public class TaskController {
             @RequestParam(required = false) TaskStatus status,
             @RequestParam(required = false) TaskPriority priority) {
 
-        log.info("Fetching tasks for author {} with filters - status: {}, priority: {}", userId, status, priority);
+        log.info("Fetching tasks for author {}", userId);
         // Поиск задач по идентификатору пользователя
         Page<TaskResponseDto> tasks = taskService.getTasksByAuthor(userId, page, size, status, priority);
         return ResponseEntity.ok(tasks);
     }
 
 
-    // Получение задачи по ID
+    /**
+     * Получение задачи по идентификатору
+     *
+     * @param taskId - идентификатор задачи
+     * @return - задача
+     */
     @GetMapping("/{taskId}")
-    public ResponseEntity<Task> findTaskById(@PathVariable Long taskId) {
-        Task task = taskService.findTaskById(taskId);
+    public ResponseEntity<TaskResponseDto> findTaskById(@PathVariable Long taskId) {
+
+        log.info("Fetching task with ID: {}", taskId);
+        // Поиск задачи по идентификатору
+        TaskResponseDto task = taskService.getTaskById(taskId);
+
+        log.info("Task found: {} with ID: {}", task.getName(), taskId);
         return ResponseEntity.ok(task);
     }
 
-    // Получение всех задач с фильтрацией и пагинацией
+
+    /**
+     * Получение всех задач с фильтрацией и пагинацией.
+     * Доступно всем аутентифицированным пользователям
+     *
+     * @param page - номер страницы
+     * @param size - размер страницы
+     * @param status - статус задачи
+     * @param priority - приоритет задачи
+     * @return - все задачи
+     */
     @GetMapping
-    public ResponseEntity<Page<Task>> findAllTasks(
-            @RequestParam Optional<String> status,
-            @RequestParam Optional<String> priority,
-            @RequestParam int page,
-            @RequestParam int size
+    public ResponseEntity<Page<TaskResponseDto>> findAllTasks(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) TaskStatus status,
+            @RequestParam(required = false) TaskPriority priority
     ) {
-        Page<Task> tasks = taskService.findTasks(status, priority, page, size);
+
+        log.info("Fetching all tasks");
+        Page<TaskResponseDto> tasks = taskService.getAllTasks(status, priority, page, size);
         return ResponseEntity.ok(tasks);
     }
 
 
-    // Получение задач по ID исполнителя
+    /**
+     * Получение задач по исполнителю с фильтрацией и пагинацией.
+     *
+     * @param userId - идентификатор исполнителя
+     * @param page - номер страницы
+     * @param size - размер страницы
+     * @param status - статус задачи
+     * @param priority - приоритет задачи
+     * @return - задачи по исполнителю
+     */
     @GetMapping("/executor/{userId}")
-    public ResponseEntity<Page<Task>> findAllTasksByExecutorId(@PathVariable Long userId) {
-        Page<Task> tasks = taskService.findTasksByExecutorId(userId);
+    public ResponseEntity<Page<TaskResponseDto>> findTasksByExecutorId(
+            @PathVariable Long userId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) TaskStatus status,
+            @RequestParam(required = false) TaskPriority priority
+    ) {
+
+        log.info("Fetching tasks for executor {}", userId);
+        Page<TaskResponseDto> tasks = taskService.getTasksByExecutorId(userId, page, size, status, priority);
         return ResponseEntity.ok(tasks);
     }
 
-    // Получение всех комментариев по задаче
+
+    /**
+     * Получение комментариев по задаче
+     *
+     * @param taskId - идентификатор задачи
+     * @return - список комментариев
+     */
     @GetMapping("/comment/{taskId}")
-    public ResponseEntity<List<Comment>> findAllCommentsByTaskId(@PathVariable Long taskId) {
-        List<Comment> comments = taskService.findCommentsByTaskId(taskId);
+    public ResponseEntity<Page<CommentResponseDto>> findCommentsByTaskId(
+            @PathVariable Long taskId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        log.info("Fetching comments for task {}", taskId);
+        Page<CommentResponseDto> comments = taskService.getCommentsByTaskId(taskId, page, size);
         return ResponseEntity.ok(comments);
     }
 }

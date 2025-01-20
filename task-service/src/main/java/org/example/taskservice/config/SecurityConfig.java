@@ -34,8 +34,10 @@ public class SecurityConfig {
                                     "/tasks/swagger-resources/**",
                                     "/tasks/actuator/**",
                                     "/tasks/swagger-ui.html").permitAll()
-                            .requestMatchers("/tasks/status/**").hasAnyRole("ADMIN", "USER_EXECUTOR")
-                            .requestMatchers("/tasks/**").hasRole("ADMIN")
+                            .requestMatchers("/tasks/admin/**").hasRole("ADMIN")
+                            .requestMatchers("/tasks/executors/**").hasAnyRole("ADMIN", "EXECUTOR")
+                            .requestMatchers("/tasks/**").authenticated()
+
                             .anyRequest().authenticated()
             ).sessionManagement(session -> session.sessionCreationPolicy(STATELESS))
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);

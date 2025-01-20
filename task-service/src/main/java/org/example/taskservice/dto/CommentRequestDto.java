@@ -9,7 +9,4 @@ public class CommentRequestDto {
 
     @Schema(description = "Текст комментария")
     private String content;
-
-    @Schema(description = "ID задачи")
-    private Long taskId;
 }
