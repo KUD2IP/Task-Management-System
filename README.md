@@ -52,7 +52,20 @@ Bash
    ```
 4. Проверка статуса:
 
-   - Убедитесь, что все сервисы успешно запущены и зарегистрированы в Eureka Server.
+    - Убедитесь, что все сервисы успешно запущены и зарегистрированы в Eureka Server.
+   - Если произошли ошибки при запуске сервисов, попробуйте запустить поочередно, дождавшись запуска каждого сервиса (config-server -> eureka-server -> api-gateway -> authentication-service -> task-service)
+   - Если после этого не получилось изюежать ошибок, попробуйте запуск в локальной среде. Запустите config-server с profiles active = native, остальные сервисе с local
+```
+cd путь к сервису (task-service)
+```
+Сборка проекта 
+```
+mvn clean install
+```
+Запуск
+```
+mvn spring-boot:run -D spring.profiles.active=local (или native, если config-server)
+```
 
 ## Использование
 
