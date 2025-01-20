@@ -29,10 +29,8 @@ services:
     container_name: config-server
     ports:
       - "8888:8888"
-    volumes:
-      - ./config-server/classpath:/configurations:/app/configurations
     environment:
-      SPRING_PROFILES_ACTIVE: docker
+      SPRING_PROFILES_ACTIVE: native
     networks:
       - backend-network
 

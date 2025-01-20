@@ -1,5 +1,7 @@
 spring:
   application:
     name: task-service
+  datasource:
+    url: jdbc:postgresql://task_db:5432/task_service
   config:
     import: optional:configserver:http://config-server:8888

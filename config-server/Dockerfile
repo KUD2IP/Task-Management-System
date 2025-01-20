@@ -7,7 +7,7 @@ WORKDIR /app
 ARG JAR_FILE=target/*.jar
 COPY ${JAR_FILE} app.jar
 
-COPY src/main/resources/configurations-local /configurations
+COPY src/main/resources/configurations /configurations
 
 # Устанавливаем переменные среды
 ENV SPRING_PROFILES_ACTIVE=docker

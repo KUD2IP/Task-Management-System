@@ -2,13 +2,13 @@ spring:
   application:
     name: config-server
 
+  profiles:
+    active: native
+
   cloud:
     config:
       server:
-        git:
-          uri:
         native:
-          search-locations: file:src/main/resources/configurations-docker
-
+          search-locations: classpath:/configurations
 server:
   port: 8888

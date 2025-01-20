@@ -11,7 +11,6 @@ spring:
 
     #Database PostrgreSQL
     datasource:
-        url: jdbc:postgresql://task_db:5434/task_service
         username: task_user
         password: task_password
         driver-class-name: org.postgresql.Driver
