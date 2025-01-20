@@ -1,0 +1,48 @@
+eureka:
+    instance:
+        hostname: eureka-server
+    client:
+        service-url:
+            defaultZone: http://eureka-server:8761/eureka
+
+spring:
+    application:
+        name: task-service
+
+    #Database PostrgreSQL
+    datasource:
+        url: jdbc:postgresql://task_db:5434/task_service
+        username: task_user
+        password: task_password
+        driver-class-name: org.postgresql.Driver
+    jpa:
+        properties:
+            hibernate:
+                dialect: org.hibernate.dialect.PostgreSQLDialect
+        hibernate:
+            ddl-auto: create
+        show-sql: true
+
+security:
+    jwt:
+        secret_key: c39d70463be1a5a035db4cf1f655d59434cdc5c34b29f1c25bc6a21ad3c25e22
+
+logging:
+    level:
+        org.springframework.web: DEBUG
+    file:
+        name: logs/task-service.log
+
+server:
+    servlet:
+        context-path: /api/v1
+
+    port: 8082
+
+springdoc:
+    api-docs:
+        enabled: true
+        path: /tasks/v3/api-docs
+    swagger-ui:
+        enabled: true
+        path: /tasks/swagger-ui.html

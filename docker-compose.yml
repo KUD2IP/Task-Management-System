@@ -23,6 +23,74 @@ services:
       - "5434:5432"
     networks:
       - backend-network
+  config-server:
+    build:
+      context: ./config-server
+    container_name: config-server
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./config-server/classpath:/configurations:/app/configurations
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    networks:
+      - backend-network
+
+  eureka-server:
+    build:
+      context: ./eureka-server
+    container_name: eureka-server
+    ports:
+      - "8761:8761"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on:
+      - config-server
+    networks:
+      - backend-network
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+    container_name: api-gateway
+    ports:
+      - "8222:8222"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_SERVER_URI: http://config-server:8888
+    depends_on:
+      - config-server
+      - eureka-server
+    networks:
+      - backend-network
+
+  authentication-service:
+    build:
+      context: ./authentication-service
+    container_name: authentication-service
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on:
+      - config-server
+      - eureka-server
+    networks:
+      - backend-network
+
+  task-service:
+    build:
+      context: ./task-service
+    container_name: task-service
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on:
+      - config-server
+      - eureka-server
+    networks:
+      - backend-network
 networks:
   backend-network:
     driver: bridge
